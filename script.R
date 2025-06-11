@@ -43,7 +43,15 @@ df <- data[[5]] %>%
   left_join(data[[1]] %>%
               select(agency_id, agency_name)
             ) %>%
+  left_join(data[[3]] %>%
+              select(service_id, date)
+            ) %>%
   select(-c(pickup_type, drop_off_type, agency_id, stop_id))
+
+df %>% count(route_type)
+sum(is.na(df$date))
+length(df$date)
+calendar_dates %>% count(date)
 
 pal <- colorFactor(
   palette = c('red'),
@@ -91,7 +99,6 @@ basemap <- leaflet() %>%
     options = layersControlOptions(collapsed = FALSE)
   )
 basemap
-a <- df$route_type
-summarise(a)
+
 
 saveWidget(basemap, file = "/Users/budo20124/OneDrive - Hatch Ltd/Documents/map1.html")
