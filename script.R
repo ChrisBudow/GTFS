@@ -1,5 +1,6 @@
 library(tidyverse)
 library(leaflet)
+library(htmlwidgets)
 
 # Workspace
 print(getwd())
@@ -26,8 +27,38 @@ trips <- data[[7]]
 test <- data[[5]] %>%
   filter(trip_id == "538")
 
-test1 <- test %>% left_join(data[[6]] %>% select(stop_id, stop_lat, stop_lon))
+df <- data[[5]] %>%
+  left_join(
+    data[[6]] %>%
+      mutate(id = ifelse(is.na(parent_station), stop_id, parent_station)) %>%
+      select(stop_id, stop_lat, stop_lon, stop_name, id)
+    ) %>%
+  left_join(data[[7]] %>%
+              select(trip_id, route_id, service_id)
+            ) %>%
+  left_join(data[[4]] %>%
+              mutate(route_type = gsub("[0-9 ]", "", data[[4]]$route_short_name)) %>%
+              select(route_id, route_short_name, agency_id, route_type)
+            ) %>%
+  left_join(data[[1]] %>%
+              select(agency_id, agency_name)
+            ) %>%
+  select(-c(pickup_type, drop_off_type, agency_id, stop_id))
+
+pal <- colorFactor(
+  palette = c('red'),
+  domain = test1$route_type
+)
+
+test <- head(df, 2)
+test <- data[[6]] %>% 
+  mutate(id = ifelse(is.na(parent_station), stop_id, parent_station))
+
+df <- sample_n(df, 1000)
   
+unique(gsub("[0-9 ]", "", data[[4]]$route_short_name))
+
+
 #stop_id=service_id, stop_times
 
 ## MAP
@@ -35,14 +66,32 @@ test1 <- test %>% left_join(data[[6]] %>% select(stop_id, stop_lat, stop_lon))
 basemap <- leaflet() %>%
   addTiles() %>%
   setView(
-    lng = mean(test1$stop_lon),
-    lat = mean(test1$stop_lat),
-    zoom = 5
+    lng = mean(df$stop_lon),
+    lat = mean(df$stop_lat),
+    zoom = 8
   ) %>%
   addCircleMarkers(
-    lng = test1$stop_lon,
-    lat = test1$stop_lat,
+    lng = df$stop_lon,
+    lat = df$stop_lat,
     color = "black",
-    label = data[[6]]$stop_name
+    label = df$stop_name,
+    fillOpacity = 1,
+    stroke = FALSE
+  ) %>%
+  addPolylines(
+    lng  = df$stop_lon,
+    lat = df$stop_lat,
+    opacity = 1,
+    label = paste(df$route_type, " ", df$trip_id, sep = ""),
+    weight = 2,
+    group = df$route_type
+  ) %>%
+  addLayersControl(
+    overlayGroups = df$route_type,
+    options = layersControlOptions(collapsed = FALSE)
   )
 basemap
+a <- df$route_type
+summarise(a)
+
+saveWidget(basemap, file = "/Users/budo20124/OneDrive - Hatch Ltd/Documents/map1.html")
