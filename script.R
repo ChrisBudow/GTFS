@@ -24,7 +24,7 @@ stop_times <- data[[5]]
 stops <- data[[6]]
 trips <- data[[7]]
 
-test <- data[[5]] %>%
+df <- data[[5]] %>%
   filter(trip_id == "538")
 
 df <- data[[5]] %>%
@@ -62,7 +62,8 @@ test <- head(df, 2)
 test <- data[[6]] %>% 
   mutate(id = ifelse(is.na(parent_station), stop_id, parent_station))
 
-df <- sample_n(df, 1000)
+df <- df %>%
+  filter(trip_id == "538")
   
 unique(gsub("[0-9 ]", "", data[[4]]$route_short_name))
 
