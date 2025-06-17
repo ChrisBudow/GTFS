@@ -3,6 +3,9 @@ library(tidyverse)
 library(ggplot2)
 library(sf)
 library(leaflet)
+library(plotly)
+library(ggthemes)
+library(gganimate)
 
 #DATA PREP
 
@@ -43,9 +46,12 @@ trips <- data[[7]]
 # plot(df_sf_t)
 
 df <- data[[5]] %>%
+  mutate(arrival_time = as.integer(arrival_time)) %>%
+  mutate(testsec = as.integer(1:nrow(df))) %>%
   left_join(
     data[[6]] %>%
-      mutate(id = ifelse(is.na(parent_station), stop_id, parent_station)) %>%
+      mutate(
+        id = ifelse(is.na(parent_station), stop_id, parent_station)) %>%
       select(stop_id, stop_lat, stop_lon, stop_name)
   ) %>%
   arrange(trip_id, stop_sequence) %>%
@@ -62,28 +68,11 @@ df <- data[[5]] %>%
 
 #stop map
 df_stop <- df %>%
-  select(stop_lat, stop_lon, stop_name)
-
+  select(stop_lat, stop_lon, stop_name) %>%
+  unique()
+  
 #line map
-df_j <- df %>% select(stop_name, shape_id, stop_lon, stop_lat)
-test <- data[[4]] %>%
-  left_join(df_j,
-            by = c("shape_id" = "shape_id",
-                   "shape_pt_lat" = "stop_lat",
-                   "shape_pt_lon" = "stop_lon"))
-leaflet() %>%
-  addTiles() %>%
-  addMarkers(
-    lat = test$shape_pt_lat,
-    lng = test$shape_pt_lon,
-    label = test$stop_name
-  )
-
-df_shp <- data[[4]] %>%
-  left_join(df %>%
-              select(stop_name, shape_id)
-  ) %>%
-  #na.omit() %>% 
+df_lines <- data[[4]] %>%
   arrange(shape_id, shape_pt_sequence) %>%
   st_as_sf(coords = c("shape_pt_lon", "shape_pt_lat")) %>% 
   group_by(shape_id) %>% 
@@ -92,14 +81,53 @@ df_shp <- data[[4]] %>%
   st_set_crs("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs") %>% 
   st_transform(crs="+proj=longlat +datum=WGS84")
 
-map <- leaflet() %>%
-  addTiles() %>%
-  addMarkers(
+# animated
+
+test <- df %>%
+  ggplot() +
+  geom_point(
     data = df_stop,
-    lng = df_stop$stop_lon,
-    lat = df_stop$stop_lat,
-    label = df_stop$stop_name
-  )
+    aes(
+      x = stop_lon,
+      y = stop_lat 
+    ),
+    color = "red"
+  ) +
+  geom_sf(
+    data = df_lines
+  ) +
+  labs(
+    title = "Time: {arrival_time}",
+    x = "Lon",
+    y = "Lat"
+  ) + 
+  transition_manual(testsec)
+test
+
+anim <- ggplot(airquality, aes(Day, Temp)) +
+  geom_point(aes(colour = factor(Month))) +
+  transition_time(Day)
+
+
+length(df$arrival_time)
+length(na.omit(df$arrival_time))
+
+summary(df$arrival_time)
+class(df$arrival_time)
+class(c(22260, 86399))
+
+library(gapminder)
+library(gganimate)
+library(dplyr)
+
+a <- gapminder %>%
+  ggplot(aes(gdpPercap, lifeExp, color = continent, group = country)) +
+  geom_point() +
+  transition_time(-year) +
+  labs(title = "Year: {-frame_time}")
+
+animate(a, nframes = 50, duration = 5)
+## SHINY
 
 ui <- fluidPage(
   leafletOutput(outputId = "map")
