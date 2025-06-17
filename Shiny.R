@@ -27,50 +27,6 @@ stop_times <- data[[5]]
 stops <- data[[6]]
 trips <- data[[7]]
 
-#df_sf <- st_as_sf(data[[4]], coords = c("shape_pt_lon", "shape_pt_lat"), crs = st_crs("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
-#df_sf1 <- st_simplify(df_sf, preserveTopology = TRUE, dTolerance =  100)
-#t1 <- st_multilinestring()
-
-#df_sf_t <- st_simplify(df_sf_t, preserveTopology = FALSE, dTolerance =  1000)
-#leaflet(df_sf_t %>% filter(shape_id == "395104")) %>%
-#  addTiles() %>%
-#  addPolylines() %>%
-#  addMarkers(
-#    lng = t$shape_pt_lon,
-#    lat = t$shape_pt_lat,
-#    color = "black",
-#    label = t$shape_pt_sequence,
-#    fillOpacity = 1,
-#    stroke = FALSE
-#  )
-# plot(df_sf_t)
-
-df <- data[[5]] %>%
-  mutate(arrival_time = as.integer(arrival_time)) %>%
-  mutate(testsec = as.integer(1:nrow(df))) %>%
-  left_join(
-    data[[6]] %>%
-      mutate(
-        id = ifelse(is.na(parent_station), stop_id, parent_station)) %>%
-      select(stop_id, stop_lat, stop_lon, stop_name)
-  ) %>%
-  arrange(trip_id, stop_sequence) %>%
-  left_join(data[[7]] %>%
-              select(trip_id, route_id, service_id, shape_id, direction_id)
-  ) %>%
-  #full_join(data[[4]]) %>%
-  #            select(shape_id, route_short_name, agency_id, route_type)
-  #) %>%
-  left_join(data[[3]] %>%
-              select(route_id, route_long_name, route_type, route_color)
-  ) %>%
-  select(-c(pickup_type, drop_off_type, stop_headsign, stop_id))
-
-#stop map
-df_stop <- df %>%
-  select(stop_lat, stop_lon, stop_name) %>%
-  unique()
-  
 #line map
 df_lines <- data[[4]] %>%
   arrange(shape_id, shape_pt_sequence) %>%
@@ -81,52 +37,48 @@ df_lines <- data[[4]] %>%
   st_set_crs("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs") %>% 
   st_transform(crs="+proj=longlat +datum=WGS84")
 
-# animated
+#big DF
+df <- data[[5]] %>%
+  left_join(
+    data[[6]] %>%
+      mutate(
+        id = ifelse(is.na(parent_station), stop_id, parent_station)) %>%
+      select(stop_id, stop_lat, stop_lon, stop_name)
+  ) %>%
+  arrange(trip_id, stop_sequence) %>%
+  left_join(data[[7]] %>%
+              select(trip_id, route_id, service_id, shape_id, direction_id)
+  ) %>%
+  left_join(data[[3]] %>%
+              select(route_id, route_long_name, route_type, route_color)
+  ) %>%
+  left_join(df_lines) %>%
+  select(-c(pickup_type, drop_off_type, stop_headsign, stop_id, departure_time, route_id, service_id, shape_id))
 
+# animated
 test <- df %>%
-  ggplot() +
-  geom_point(
-    data = df_stop,
-    aes(
-      x = stop_lon,
-      y = stop_lat 
-    ),
-    color = "red"
-  ) +
-  geom_sf(
-    data = df_lines
-  ) +
+  filter(trip_id == paste(c(as.vector(slice_sample(df %>% select(trip_id), n = 10)))$trip_id, sep = ", ")) %>%
+  ggplot() + 
+  geom_p
   labs(
     title = "Time: {arrival_time}",
     x = "Lon",
     y = "Lat"
   ) + 
-  transition_manual(testsec)
+  transition_time(arrival_time) +
+  geom_sf(
+    data = df %>% select(geometry) %>% distinct(),
+    aes(geometry = geometry)
+  ) +
+  geom_point(
+    aes(
+      x = stop_lon,
+      y = stop_lat 
+    ),
+    color = "red"
+  )
 test
 
-anim <- ggplot(airquality, aes(Day, Temp)) +
-  geom_point(aes(colour = factor(Month))) +
-  transition_time(Day)
-
-
-length(df$arrival_time)
-length(na.omit(df$arrival_time))
-
-summary(df$arrival_time)
-class(df$arrival_time)
-class(c(22260, 86399))
-
-library(gapminder)
-library(gganimate)
-library(dplyr)
-
-a <- gapminder %>%
-  ggplot(aes(gdpPercap, lifeExp, color = continent, group = country)) +
-  geom_point() +
-  transition_time(-year) +
-  labs(title = "Year: {-frame_time}")
-
-animate(a, nframes = 50, duration = 5)
 ## SHINY
 
 ui <- fluidPage(
