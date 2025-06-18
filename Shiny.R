@@ -59,8 +59,7 @@ df <- data[[5]] %>%
 test <- df %>%
   filter(trip_id == paste(c(as.vector(slice_sample(df %>% select(trip_id), n = 10)))$trip_id, sep = ", ")) %>%
   ggplot() + 
-  geom_p
-  labs(
+    labs(
     title = "Time: {arrival_time}",
     x = "Lon",
     y = "Lat"
