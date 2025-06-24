@@ -21,7 +21,7 @@ Read_Shapefile <- function(shp_path) {
   return(x)
 }
 
-# shp to df
+# shp to tibble
 shp_to_df <- function(shp) {
   df_shp <- shp %>%
     select(object_id, street_name, segment_len, geometry)
@@ -43,9 +43,17 @@ shp_to_df <- function(shp) {
   return (df)
 }
 
-shp <- read_sf(dsn = "import/Translink/bikeways/")
+# tibble to df
+df_shp <- function(shpdf) {
+  df <- shpdf %>%
+    st_drop_geometry() %>%
+    as.data.frame()
+  return(df)
+}
 
+shp <- read_sf(dsn = "import/Translink/bikeways/")
 df1 <- shp_to_df(shp)
+df <- df_shp(df1)
 
 up <- df %>%
   ggplot() +
@@ -64,26 +72,25 @@ down <- df %>%
 ## SHINY
 
 ui <- fluidPage(
-  fileInput(
-    "filemap",
-    label = NULL,
-    multiple = TRUE,
-    accept = c('.shp','.dbf','.sbn','.sbx','.shx','.prj','.cpg')
+  fluidRow(
+    fileInput(
+      "filemap",
+      label = NULL,
+      multiple = TRUE,
+      accept = c('.shp','.dbf','.sbn','.sbx','.shx','.prj','.cpg')
     ),
-  tableOutput("df"),
-  tableOutput("table")
+    tableOutput("table") 
+  )
 )
 
 server <- function(input, output, session) {
   data <- reactive({
-    # Read-shapefile once user submits files
-    observeEvent(input$shp, {
-      user_shp <- Read_Shapefile(input$shp)
-
-    })
-    output$df <- renderTable(shp_to_df(user_shp))
+    user_shp <- Read_Shapefile(input$shp)
+    df <- shp_to_df(data)
   })
-  output$table <- renderTable(df1)
+  output$table <- renderTable(df_shp(df))
 }
 
 shinyApp(ui, server)
+
+cars
