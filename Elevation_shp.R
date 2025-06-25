@@ -4,6 +4,7 @@ library(sf)
 library(leaflet)
 library(geosphere)
 library(shiny)
+library(plotly)
 
 getwd()
 setwd(getwd())
@@ -11,15 +12,16 @@ setwd(getwd())
 ## FUNCTIon
 
 # Read-in shapefile function
-Read_Shapefile <- function(shp_path) {
-  infiles <- shp_path$datapath # get the location of files
-  dir <- unique(dirname(infiles)) # get the directory
-  outfiles <- file.path(dir, shp_path$name) # create new path name
-  name <- strsplit(shp_path$name[1], "\\.")[[1]][1] # strip name 
-  purrr::walk2(infiles, outfiles, ~file.rename(.x, .y)) # rename files
-  x <- read_sf(file.path(dir, paste0(name, ".shp"))) # read-in shapefile
-  return(x)
-}
+#Read_Shapefile <- function(shp_path) {
+#  shp_path <- "import/Translink/shp"
+#  infiles <- shp_path$datapath # get the location of files
+#  dir <- unique(dirname(infiles)) # get the directory
+#  outfiles <- file.path(dir, shp_path$name) # create new path name
+#  name <- strsplit(shp_path$name[1], "\\.")[[1]][1] # strip name 
+#  purrr::walk2(infiles, outfiles, ~file.rename(.x, .y)) # rename files
+#  x <- read_sf(file.path(dir, paste0(name, ".shp"))) # read-in shapefile
+#  return(x)
+#}
 
 # shp to tibble
 shp_to_df <- function(shp) {
@@ -51,6 +53,7 @@ df_shp <- function(shpdf) {
   return(df)
 }
 
+#shp <- Read_Shapefile()
 shp <- read_sf(dsn = "import/Translink/bikeways/")
 df1 <- shp_to_df(shp)
 df <- df_shp(df1)
@@ -70,27 +73,14 @@ down <- df %>%
 
 
 ## SHINY
+#https://stackoverflow.com/questions/71024105/why-wont-renderdt-return-a-table-on-my-shiny-app
 
 ui <- fluidPage(
-  fluidRow(
-    fileInput(
-      "filemap",
-      label = NULL,
-      multiple = TRUE,
-      accept = c('.shp','.dbf','.sbn','.sbx','.shx','.prj','.cpg')
-    ),
-    tableOutput("table") 
-  )
+    tableOutput("t") 
 )
 
 server <- function(input, output, session) {
-  data <- reactive({
-    user_shp <- Read_Shapefile(input$shp)
-    df <- shp_to_df(data)
-  })
-  output$table <- renderTable(df_shp(df))
+  output$t <- renderTable(df)
 }
 
 shinyApp(ui, server)
-
-cars
