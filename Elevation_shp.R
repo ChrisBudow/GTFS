@@ -73,14 +73,6 @@ df1 <- shp_to_df(shp_t)
 df <- df_shp(df1)
 
 ## Plots
-
-t <- shp_t %>%
-  leaflet() %>%
-  addTiles() %>%
-  addPolylines(
-    opacity = 1,
-    weight = 2.5
-  )
 t <- map_l(shp_t)
 t
 
