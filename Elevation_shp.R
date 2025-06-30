@@ -29,11 +29,16 @@ shp_to_df <- function(shp) {
   df_shp <- shp %>%
     select(object_id, street_name, segment_len, geometry)
   
-  df_shp$geometry <- st_sample(df_shp, size = 100)
+  df_shp$geometry <- df_shp %>%
+    st_sample(exact = TRUE,
+              size = round(df_shp$segment_len/100))
   df_shp_t_p <- st_cast(df_shp, "POINT")
   
   crs_dd <- 4326
-  df_h <- get_elev_point(df_shp_t_p, prj = crs_dd, src = "aws")
+  df_h <- get_elev_point(df_shp_t_p,
+                         prj = crs_dd,
+                         src = "aws",
+                         z = 12)
   
   df_h <- df_h %>%
     mutate(length = cumsum(segment_len))
@@ -81,11 +86,18 @@ l <- df %>%
     aes(x = length,
         y = elevation)
   ) +
-  geom_line() +
-  stat_smooth() +
+  stat_smooth(
+    se = FALSE
+  ) +
   theme_minimal() +
   theme(
     panel.grid.minor = element_blank()
+  ) + 
+  labs(
+    x = "Length",
+    y = "Elevation",
+    title = "Elevation Profile",
+    subtitle = ~street_name
   )
 l
 ggplotly(l)
