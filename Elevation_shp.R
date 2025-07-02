@@ -4,7 +4,6 @@ library(sf)
 library(leaflet)
 library(geosphere)
 library(shiny)
-library(plotly)
 library(collapse)
 
 getwd()
@@ -87,45 +86,25 @@ map_ep <- function(t) {
     labs(
       x = "Length",
       y = "Elevation",
-      title = "Elevation Profile",
-      subtitle = ~street_name
+      title = "Elevation Profile"
     ) 
   return(l)
 }
 
-# Caller function
-selectVarInput <- function(id) {
-  selectInput(NS(id, "var"), "Variable", choices = NULL) 
-}
-
-find_vars <- function(data, filter) {
-  names(data)[vapply(data, filter, logical(1))]
-}
-
-selectVarServer <- function(id, data, filter = is.numeric) {
-  moduleServer(id, function(input, output, session) {
-    observeEvent(data(), {
-      updateSelectInput(session, "var", choices = find_vars(data(), filter))
-    })
-    
-    reactive(data()[[input$var]])
-  })
-}
-
 #shp <- Read_Shapefile()
-shp <- read_sf(dsn = "import/Translink/bikeways/")
-shp_t <- shp %>%
-  filter(object_id == "2581")
-df1 <- shp_to_df(shp_t)
-df <- df_shp(df1)
+#shp <- read_sf(dsn = "import/Translink/bikeways/")
+#shp_t <- shp %>%
+#  filter(object_id == "2581")
+#df1 <- shp_to_df(shp_t)
+#df <- df_shp(df1)
 
 ## Plots
-t <- map_l(shp_t)
-t
+#t <- map_l(shp_t)
+#t
 
-l <- map_ep(df)
-l
-ggplotly(l)
+#l <- map_ep(df)
+#l
+#ggplotly(l)
 
 ## SHINY
 #https://stackoverflow.com/questions/71024105/why-wont-renderdt-return-a-table-on-my-shiny-app
@@ -143,17 +122,20 @@ ui <- fluidPage(
                 label = "Upload map. Choose shapefile",
                 multiple = TRUE,
                 accept = c('.shp','.dbf','.sbn','.sbx','.shx','.prj')),
-      selectVarInput("var")
+      uiOutput("column_ui"),
+      uiOutput("value_ui"),
+      actionButton("plot_btn", "Generate Plot")
       ),
   mainPanel(
-    leafletOutput(outputId = "map"),
-  #  plotOutput("plot")
+    leafletOutput("leamap"),
+    plotOutput("eleplot")
   )
   )
 )
 
 server <- function(input, output, session) {
   options(shiny.maxRequestSize = 100*1024^2)
+  
   map <- reactive({
     req(input$filemap)
     shpdf <- input$filemap
@@ -164,21 +146,47 @@ server <- function(input, output, session) {
         paste0(tempdirname, "/", shpdf$name[i])
       )
     }
- 
     map <- read_sf(paste(tempdirname,
                          shpdf$name[grep(pattern = "*.shp$", shpdf$name)],
-                         sep = "/"
-    ))
-    shp_t <- selectVarServer("var", data, filter = filter)
-    df1 <- shp_to_df(map())
-    df <- df_shp(df1)
+                         sep = "/"))
   })
-  output$map <- renderLeaflet({
-    map <- map_l(df)
+  
+  output$column_ui <- renderUI({
+    req(map())
+    selectInput("column", "Select Column",
+                choices = names(map()))
   })
-  #output$plot <- renderPlot({
-  #  map_ep(df)
-  #})
+  
+  output$value_ui <- renderUI({
+    req(input$column)
+    selectInput("value", "Select Value(s)", 
+                choices = map()[[input$column]]
+    )
+  })
+  
+  plot_data <- eventReactive(input$plot_btn, {
+    req(input$value)
+    df <- map()
+    df[df[[input$column]] %in% input$value, ] %>%
+      shp_to_df()
+  })
+  
+  output$leamap <- renderLeaflet({
+    req(plot_data())
+    map_l(plot_data())
+  })
+  
+  plot_data1 <- eventReactive(input$plot_btn, {
+    req(plot_data)
+    df <- plot_data()
+    df %>%
+      df_shp()
+  })
+  
+  output$eleplot <- renderPlot({
+    req(plot_data1())
+    print(map_ep(plot_data1()))
+  })
 }
 
 shinyApp(ui, server)
