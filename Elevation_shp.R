@@ -27,7 +27,7 @@ setwd(getwd())
 # shp to tibble
 shp_to_df <- function(shp) {
   df_shp <- shp %>%
-    select(object_id, street_name, segment_len, geometry)
+    select(object_id, bike_route_, street_name, segment_len, geometry)
   
   df_shp$geometry <- df_shp %>%
     st_sample(exact = TRUE,
@@ -70,6 +70,48 @@ map_l <- function(t) {
   return(map)
 }
 
+# Elevation Profile
+map_ep <- function(t) {
+  l <- t %>%
+    ggplot(
+      aes(x = length,
+          y = elevation)
+    ) +
+    stat_smooth(
+      se = FALSE
+    ) +
+    theme_minimal() +
+    theme(
+      panel.grid.minor = element_blank()
+    ) + 
+    labs(
+      x = "Length",
+      y = "Elevation",
+      title = "Elevation Profile",
+      subtitle = ~street_name
+    ) 
+  return(l)
+}
+
+# Caller function
+selectVarInput <- function(id) {
+  selectInput(NS(id, "var"), "Variable", choices = NULL) 
+}
+
+find_vars <- function(data, filter) {
+  names(data)[vapply(data, filter, logical(1))]
+}
+
+selectVarServer <- function(id, data, filter = is.numeric) {
+  moduleServer(id, function(input, output, session) {
+    observeEvent(data(), {
+      updateSelectInput(session, "var", choices = find_vars(data(), filter))
+    })
+    
+    reactive(data()[[input$var]])
+  })
+}
+
 #shp <- Read_Shapefile()
 shp <- read_sf(dsn = "import/Translink/bikeways/")
 shp_t <- shp %>%
@@ -81,36 +123,62 @@ df <- df_shp(df1)
 t <- map_l(shp_t)
 t
 
-l <- df %>%
-  ggplot(
-    aes(x = length,
-        y = elevation)
-  ) +
-  stat_smooth(
-    se = FALSE
-  ) +
-  theme_minimal() +
-  theme(
-    panel.grid.minor = element_blank()
-  ) + 
-  labs(
-    x = "Length",
-    y = "Elevation",
-    title = "Elevation Profile",
-    subtitle = ~street_name
-  )
+l <- map_ep(df)
 l
 ggplotly(l)
 
 ## SHINY
 #https://stackoverflow.com/questions/71024105/why-wont-renderdt-return-a-table-on-my-shiny-app
+#https://www.paulamoraga.com/book-geospatial/sec-shinyexample.html
+#https://stackoverflow.com/questions/64911003/r-shiny-how-to-select-input-form-data-frame-column-reactive
 
 ui <- fluidPage(
-    tableOutput("t") 
+  titlePanel(
+    p("Titel",
+      style = "color:#3474A7")
+  ),
+  sidebarLayout(
+    sidebarPanel(
+      fileInput(inputId = "filemap",
+                label = "Upload map. Choose shapefile",
+                multiple = TRUE,
+                accept = c('.shp','.dbf','.sbn','.sbx','.shx','.prj')),
+      selectVarInput("var")
+      ),
+  mainPanel(
+    leafletOutput(outputId = "map"),
+  #  plotOutput("plot")
+  )
+  )
 )
 
 server <- function(input, output, session) {
-  output$t <- renderTable(df)
+  options(shiny.maxRequestSize = 100*1024^2)
+  map <- reactive({
+    req(input$filemap)
+    shpdf <- input$filemap
+    tempdirname <- dirname(shpdf$datapath[1])
+    for (i in 1:nrow(shpdf)) {
+      file.rename(
+        shpdf$datapath[i],
+        paste0(tempdirname, "/", shpdf$name[i])
+      )
+    }
+ 
+    map <- read_sf(paste(tempdirname,
+                         shpdf$name[grep(pattern = "*.shp$", shpdf$name)],
+                         sep = "/"
+    ))
+    shp_t <- selectVarServer("var", data, filter = filter)
+    df1 <- shp_to_df(map())
+    df <- df_shp(df1)
+  })
+  output$map <- renderLeaflet({
+    map <- map_l(df)
+  })
+  #output$plot <- renderPlot({
+  #  map_ep(df)
+  #})
 }
 
 shinyApp(ui, server)
